@@ -143,7 +143,8 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+    int a = ~x & y, b = x & ~y;
+    return ~(~a & ~b);
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -152,9 +153,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+  return 1 << 31;
 }
 //2
 /*
@@ -165,7 +164,7 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+  return !((x+1) ^ ~x);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -176,7 +175,10 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  // sort of binary search
+  int a = (x & (x >> 16));
+  int b = (a & (a >> 8));
+  return !((b & 0xAA) ^ 0xAA);
 }
 /* 
  * negate - return -x 
@@ -186,7 +188,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return ~x + 1;
 }
 //3
 /* 
@@ -199,7 +201,8 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int y = x + ~0x30 + 1;
+  return (!(y >> 3)) | !(y ^ 0x8) | !(y ^ 0x9);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -209,7 +212,8 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  int flag = !x + ~1 + 1;
+  return (flag & y) | (~flag & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -219,7 +223,9 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int yIsPos = !(y >> 31), xIsNeg = !((x >> 31) + 1);
+  int yMinusXIsPos = !((y + ~x + 1) >> 31);
+  return (yIsPos & xIsNeg) | ((yIsPos | xIsNeg) & yMinusXIsPos);
 }
 //4
 /* 
@@ -231,8 +237,13 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
-}
+  int a = x | (x << 16);
+  int b = a | (a << 8);
+  int c = b | (b << 4);
+  int d = c | (c << 2);
+  int e = d | (d << 1);
+  return (e >> 31) + 1; // arithmetic shift -> qiang!
+  }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
  *  Examples: howManyBits(12) = 5
@@ -246,7 +257,35 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  int x32 = x ^ (x >> 31);
+  int neg1 = ~1 + 1;
+
+  int high16 = x32 >> 16;
+  int high16With1 = !!high16;
+  int high16Mask = high16With1 + neg1;
+  int x16 = ((~high16Mask & high16) | (high16Mask & x32)) & ((1 << 16) + neg1);
+
+  int high8 = x16 >> 8;
+  int high8With1 = !!high8;
+  int high8Mask = high8With1 + neg1;
+  int x8 = ((~high8Mask & high8) | (high8Mask & x16)) & 0xFF;
+
+  int high4 = x8 >> 4;
+  int high4With1 = !!high4;
+  int high4Mask = high4With1 + neg1;
+  int x4 = ((~high4Mask & high4) | (high4Mask & x8)) & 0x0F;
+
+  int high2 = x4 >> 2;
+  int high2With1 = !!high2;
+  int high2Mask = high2With1 + neg1;
+  int x2 = ((~high2Mask & high2) | (high2Mask & x4)) & 0x03;
+
+  int high1 = x2 >> 1;
+  int high1With1 = !!high1;
+  int high1Mask = high1With1 + neg1;
+  int x1 = ((~high1Mask & high1) | (high1Mask & x2)) & 0x01;
+
+  return (high16With1 << 4) + (high8With1 << 3) + (high4With1 << 2) + (high2With1 << 1) + high1With1 + x1 + 1;
 }
 //float
 /* 
@@ -261,7 +300,29 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  // check through case by case
+
+  // get E and M part bit representation
+  int E = (uf >> 23) & 0xFF;
+  int M = uf & 0x7FFFFF;
+
+  // special case for NaN and inf
+  if (E == 0xFF) {
+    return uf;
+  }
+  // Denormalized case: *2 for fraction part
+  if (!E) {
+    M = M << 1;
+    // floatScale2 result is >= 1, so the result should be normalized
+    if ((M & 0x800000) == 0x800000) {
+      E = 0x01;
+    }
+  }
+  // normalized case: +1 for exponent part
+  else {
+    E ++;
+  }
+  return (uf & 0x80000000) | (E << 23) | (M & 0x7FFFFF);
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -276,7 +337,23 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  // get E, M, sign part of float bit representation
+  int E = (uf >> 23) & 0xFF;
+  int M = uf & 0x7FFFFF;
+  int sign = uf & 0x80000000;
+
+  // if E < 127, E-bias = E - 127 < 0, which means uf is (+-)0.xxxx, leading to int 0
+  if (E < 127) {
+    return 0;
+  }
+  // if E > 157, E-bias = E - 127 > 30, which means `out of range`
+  if (E > 157) {
+    return 0x80000000;
+  }
+
+  // result is 1.xxxx * 2^(E-127), so use the shift operation
+  // but take care of sign bit
+  return (sign | (1 << 30) | (M << 7)) >> (157 - E);
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -292,5 +369,23 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  /*
+   * 1. the `e` part of single precision float number is in range [-126, 127], can represent value in range [2^-126, 2^127],
+   * 2. the `f` part is 23 bit wide, which means with leading 0, it can be in range [2^-23, 2^-1]
+   * combine together, we can represent integers in range of [2^-149, 2^127]
+   * out of that range, the result should be overflow to be +INF or downflow to be 0
+   *
+   * for x >= -126, just need to calculate the `E` part
+   * for -149 <= x < -126, just need to calculate the `M` part
+   */
+  if (x > 127) {
+    return 0x7f800000;
+  }
+  if (x >= -126) {
+    return (x+127) << 23;
+  }
+  if (x >= -149) {
+    return 1 << (149 + x);
+  }
+  return 0;
 }
