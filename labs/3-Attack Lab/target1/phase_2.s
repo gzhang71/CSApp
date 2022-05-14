@@ -1,3 +1,3 @@
-mov 0x59b997fa,%edi
+mov $0x59b997fa,%edi
 pushq $0x4017ec
 retq
